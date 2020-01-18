@@ -1,283 +1,238 @@
 #include <algorithm>
-#include <exception>
-#include <iomanip>
 #include <iostream>
-#include <iterator>
-#include <limits>
 #include <map>
-#include <regex>
 #include <set>
-#include <sstream>
-#include <string>
+#include <stdint.h>
+#include <strstream>
+#include <utility>
 #include <vector>
 
 using namespace std;
 
-/*
-- добавление события:                        Add Дата Событие
-- удаление события:                          Del Дата Событие
-- удаление всех событий за конкретную дату:  Del Дата
-- поиск событий за конкретную дату:          Find Дата
-- печать всех событий за все даты:           Print
+// Принимаем словарь по значению, чтобы иметь возможность
+// обращаться к отсутствующим ключам с помощью [] и получать 0,
+// не меняя при этом исходный словарь
 
-Add 0-1-2 event1
-Add 1-2-3 event2
-Find 0-1-2
-"
-Del 0-1-2
-Print
-Del 1-2-3 event2
-Del 1-2-3 event2
-Add 0-13-32 event1
+#ifdef __TEST__
 
-*/
-
-class Date {
-    int y;
-    int d;
-    int m;
-
-    friend ostream& operator<<(ostream& s, const Date& d);
-    friend istream& operator>>(istream& s, Date& d);
-    friend bool operator<(const Date& l, const Date& r);
-
-public:
-    //    int GetYear( ) const;
-    //    int GetMonth( ) const;
-    //    int GetDay( ) const;
+// Перечислимый тип для статуса задачи
+enum class TaskStatus {
+    NEW, // новая
+    IN_PROGRESS, // в разработке
+    TESTING, // на тестировании
+    DONE // завершена
 };
 
-bool operator<(const Date& l, const Date& r)
+// Объявляем тип-синоним для map<TaskStatus, int>,
+// позволяющего хранить количество задач каждого статуса
+using TasksInfo = map<TaskStatus, int>;
+
+ostream& operator<<(ostream& s, const TasksInfo& ti)
 {
-    if (l.y == r.y && l.m == r.m) {
-        return l.d < r.d;
-    } else if (l.y == r.y && l.m != r.m) {
-        return l.m < r.m;
-    } else {
-        return l.y < r.y;
-    }
-}
-
-istream& operator>>(istream& s, Date& d)
-{
-    string str, end;
-    s >> str;
-    istringstream ss(str);
-
-#ifdef __TEST__
-    cout << "str: " << str << endl;
-#endif
-    //    regex word_regex("^(\\d+)-(-?\\d+)-(-?\\d+)$", regex_constants::ECMAScript | regex_constants::icase);
-    //    smatch pieces_match;
-    //    if (regex_match(str, pieces_match, word_regex)) {
-    //        for (size_t i = 1; i < pieces_match.size(); ++i) {
-    //            ssub_match sub_match = pieces_match[i];
-    //            if (i == 1) {
-    //                d.y = stoi(sub_match.str());
-    //            } else if (i == 2) {
-    //                d.m = stoi(sub_match.str());
-    //            } else if (i == 3) {
-    //                d.d = stoi(sub_match.str());
-    //            }
-    //#ifdef __TEST__
-    //            cout << i << "  : " << sub_match.str() << '\n';
-    //#endif
-    //        }
-    //    }
-    char c1, c2;
-    d.d = numeric_limits<int>::max();
-    d.m = numeric_limits<int>::max();
-    d.y = numeric_limits<int>::max();
-    ss >> d.y >> c1 >> d.m >> c2 >> d.d >> end;
-#ifdef __TEST__
-    cout << end << ' '
-         << c1 << ' '
-         << c2 << ' '
-         << (d.y == numeric_limits<int>::max()) << ' '
-         << (d.m == numeric_limits<int>::max()) << ' '
-         << (d.d == numeric_limits<int>::max()) << endl;
-#endif
-    if (end.size()
-        || c1 != '-'
-        || c2 != '-'
-        || d.d == numeric_limits<int>::max()
-        || d.m == numeric_limits<int>::max()
-        || d.y == numeric_limits<int>::max()) {
-        throw invalid_argument("Wrong date format: " + str);
-    }
-    if (d.m < 1 || d.m > 12) {
-        throw invalid_argument("Month value is invalid: " + to_string(d.m));
-    }
-    if (d.d < 1 || d.d > 31) {
-        throw invalid_argument("Day value is invalid: " + to_string(d.d));
-    }
-
-    return s;
-}
-ostream& operator<<(ostream& s, const Date& d)
-{
-    s << setw(4) << setfill('0') << d.y << '-'
-      << setw(2) << setfill('0') << d.m << '-'
-      << setw(2) << setfill('0') << d.d;
-    return s;
-}
-
-bool operator<(const Date& l, const Date& r);
-
-class Database {
-    map<Date, set<string>> data;
-
-public:
-    void AddEvent(const Date& date, const string& event)
-    {
-        data[date].insert(event);
-    }
-    bool DeleteEvent(const Date& date, const string& event)
-    {
-        if (data.count(date) && data[date].count(event)) {
-            data[date].erase(event);
-            return true;
-        }
-        return false;
-    }
-    int DeleteDate(const Date& date)
-    {
-        int count = 0;
-        if (data.count(date)) {
-            count = static_cast<int>(data[date].size());
-            data.erase(date);
-        }
-        return count;
-    }
-    bool Find(const Date& date) const
-    {
-        if (data.count(date)) {
-            vector<string> v(begin(data.at(date)), end(data.at(date)));
-            //            sort(begin(v), end(v),
-            //                // компаратор для сортировки — лямбда-функция, сравнивающая строки без учёта регистра
-            //                [](const string& l, const string& r) {
-            //                    // сравниваем лексикографически...
-            //                    return lexicographical_compare(
-            //                        // ... все символы строки l ...
-            //                        begin(l), end(l),
-            //                        // ... со всеми символами строки r ...
-            //                        begin(r), end(r),
-            //                        // ..., используя в качестве компаратора сравнение отдельных символов без учёта регистра
-            //                        [](char cl, char cr) { return tolower(cl) < tolower(cr); });
-            //                });
-            for (auto e : v) {
-                cout << e << endl;
-            }
-            return true;
-        }
-        return false;
-    }
-    void Print() const
-    {
-        for (const auto& [date, sets] : data) {
-            vector<string> v(begin(sets), end(sets));
-            //            sort(begin(v), end(v),
-            //                // компаратор для сортировки — лямбда-функция, сравнивающая строки без учёта регистра
-            //                [](const string& l, const string& r) {
-            //                    // сравниваем лексикографически...
-            //                    return lexicographical_compare(
-            //                        // ... все символы строки l ...
-            //                        begin(l), end(l),
-            //                        // ... со всеми символами строки r ...
-            //                        begin(r), end(r),
-            //                        // ..., используя в качестве компаратора сравнение отдельных символов без учёта регистра
-            //                        [](char cl, char cr) { return tolower(cl) < tolower(cr); });
-            //                });
-            for (auto e : v) {
-                cout << date << ' ' << e << endl;
+    //{"IN_PROGRESS": 4, "TESTING": 5, "DONE": 1}
+    s << '{';
+    for (int ts = 0, count = 0; ts <= static_cast<int>(TaskStatus::DONE); ++ts) {
+        TaskStatus i = static_cast<TaskStatus>(ts);
+        if (ti.count(i)) {
+            if (count++)
+                s << ", ";
+            switch (i) {
+            case TaskStatus::NEW:
+                s << "\"NEW\": " << ti.at(i);
+                continue;
+            case TaskStatus::IN_PROGRESS:
+                s << "\"IN_PROGRESS\": " << ti.at(i);
+                continue;
+            case TaskStatus::TESTING:
+                s << "\"TESTING\": " << ti.at(i);
+                continue;
+            case TaskStatus::DONE:
+                s << "\"DONE\": " << ti.at(i);
+                continue;
             }
         }
     }
-};
-/*
-Failed case #22/34: Wrong answer
-*/
-int main()
-{
+    s << '}';
+    return s;
+}
 
-#ifdef __TEST__
-    stringstream ssTestData(
-        "Add 0-13-32 event1\n"
-        "Add 1---2 event1\n"
-        "Add 1---2---3- event1\n"
-        "Add 1--1 event1\n"
-        "Add 1--2--3 event1\n"
-        "Add 1--2-3 event1\n"
-        "Add 1-1- event1\n"
-        "Add 1-2--3 event1\n"
-        "Add 1-2-3 event1\n"
-        "Add 1-2-3- event1\n"
-        /**/);
-
-    stringstream& cin = ssTestData;
 #endif
 
-    Database db;
+class TeamTasks {
+    map<string, TasksInfo> data;
 
-    string command;
-    while (getline(cin, command)) {
-        if (command.empty())
-            continue;
-        try {
-            stringstream parser(command);
-            string cmd;
-            parser >> cmd;
-            if (cmd == "Add") {
-                Date date;
-                string event;
-                parser >> date;
-                parser >> event;
-                //                if (event.empty()) {
-                //                    //                    stringstream ss;
-                //                    //                    ss << "Wrong date format: " << date;
-                //                    //                    throw runtime_error(ss.str());
-                //                    cout << "Event not found" << endl;
-                //                } else {
-                db.AddEvent(date, event);
-                //                }
-            } else if (cmd == "Del") {
-                Date date;
-                string event;
-                parser >> date;
-                parser >> event;
-                if (event.empty()) {
-                    cout << "Deleted " << db.DeleteDate(date) << " events" << endl;
-                } else {
-                    if (db.DeleteEvent(date, event)) {
-                        cout << "Deleted successfully" << endl;
-                    } else {
-                        cout << "Event not found" << endl;
+public:
+    // Получить статистику по статусам задач конкретного разработчика
+    const TasksInfo& GetPersonTasksInfo(const string& person) const
+    {
+        return data.at(person);
+    }
+
+    // Добавить новую задачу (в статусе NEW) для конкретного разработчитка
+    void AddNewTask(const string& person)
+    {
+        ++data[person][TaskStatus::NEW];
+    }
+#ifdef __TEST__
+    void AddNewTasks(const string& person, int count)
+    {
+        data[person][TaskStatus::NEW] += count;
+    }
+#endif
+    // Обновить статусы по данному количеству задач конкретного разработчика,
+    // подробности см. ниже
+    tuple<TasksInfo, TasksInfo> PerformPersonTasks(const string& person, int task_count)
+    {
+        TasksInfo temp;
+        TasksInfo untouched;
+        TasksInfo updated;
+        for (const auto& [key, val] : data[person]) {
+            switch (key) {
+            case TaskStatus::NEW: {
+                if (val > 0) {
+                    int count = val;
+                    while (count > 0 && task_count > 0) {
+                        temp[TaskStatus::IN_PROGRESS]++;
+                        updated[TaskStatus::IN_PROGRESS]++;
+                        --count;
+                        --task_count;
+                    }
+                    if (count > 0) {
+                        temp[TaskStatus::NEW] += count;
+                        untouched[TaskStatus::NEW] += count;
                     }
                 }
-            } else if (cmd == "Find") {
-                Date date;
-                parser >> date;
-                if (!db.Find(date)) {
-                    // cout << "Event not found" << endl;
-                }
-            } else if (cmd == "Print") {
-                db.Print();
-            } else if (cmd.empty()) {
-                continue;
-            } else {
-                throw invalid_argument("Unknown command: " + cmd);
+                break;
             }
-        } catch (invalid_argument& e) {
-#ifdef __TEST__
-            cout << "==============================" << endl;
-#endif
-            cout << e.what() << endl;
-#ifdef __TEST__
-            cout << "==============================" << endl;
-#else
-            return 0;
-#endif
+            case TaskStatus::IN_PROGRESS: {
+                if (val > 0) {
+                    int count = val;
+                    while (count > 0 && task_count > 0) {
+                        temp[TaskStatus::TESTING]++;
+                        updated[TaskStatus::TESTING]++;
+                        --count;
+                        --task_count;
+                    }
+                    if (count > 0) {
+                        temp[TaskStatus::IN_PROGRESS] += count;
+                        untouched[TaskStatus::IN_PROGRESS] += count;
+                    }
+                }
+                break;
+            }
+            case TaskStatus::TESTING: {
+                if (val > 0) {
+                    int count = val;
+                    while (count > 0 && task_count > 0) {
+                        temp[TaskStatus::DONE]++;
+                        updated[TaskStatus::DONE]++;
+                        --count;
+                        --task_count;
+                    }
+                    if (count > 0) {
+                        temp[TaskStatus::TESTING] += count;
+                        untouched[TaskStatus::TESTING] += count;
+                    }
+                }
+                break;
+            }
+            case TaskStatus::DONE: {
+                if (val > 0) {
+                    temp[TaskStatus::DONE] += val;
+                }
+                break;
+            }
+            }
         }
+        data[person] = temp;
+        return tuple<TasksInfo, TasksInfo>(updated, untouched);
+
+        //        TasksInfo tTmp = data[person];
+        //        TasksInfo updated;
+        //        TasksInfo untouched;
+
+        //        for (int iTs = 0, iLast = 0; iTs <= static_cast<int>(TaskStatus::DONE); ++iTs) {
+        //            TaskStatus i = static_cast<TaskStatus>(iTs);
+        //            if (task_count || iLast) {
+        //                int t = tTmp[i];
+        //                if (iLast)
+        //                    updated[i] = iLast;
+        //                if (int v = t - task_count; v > 0)
+        //                    untouched[i] = v;
+        //                if (i == TaskStatus::DONE)
+        //                    break;
+        //                tTmp[i] += iLast;
+        //                tTmp[i] -= task_count;
+        //                if (tTmp[i] < 1) {
+        //                    iLast = task_count + tTmp[i];
+        //                    task_count -= iLast;
+        //                    tTmp.erase(i);
+        //                } else {
+        //                    iLast = task_count;
+        //                    task_count = 0;
+        //                }
+        //            }
+        //        }
+        //        data[person] = tTmp;
+        //        return { updated, untouched };
     }
+};
+
+int main()
+{
+    TeamTasks tasks;
+#ifdef __TEST__
+    if (/* DISABLES CODE */ (1)) {
+        strstream cin;
+        cin << "AddNewTasks Alice 5" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "GetPersonTasksInfo Alice" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "GetPersonTasksInfo Alice" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "GetPersonTasksInfo Alice" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "GetPersonTasksInfo Alice" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "PerformPersonTasks Alice 1" << endl;
+        cin << "GetPersonTasksInfo Alice" << endl;
+
+        //        cin << "PerformPersonTasks Alice 5" << endl;
+        //        cin << "PerformPersonTasks Alice 1" << endl;
+        //        cin << "AddNewTasks Alice 5" << endl;
+        //        cin << "PerformPersonTasks Alice 2" << endl;
+        //        cin << "GetPersonTasksInfo Alice" << endl;
+        //        cin << "PerformPersonTasks Alice 4" << endl;
+        //        cin << "GetPersonTasksInfo Alice" << endl;
+        string cmd, name;
+        while (cin >> cmd >> name) {
+            if (cmd == "AddNewTasks") {
+                int cnt;
+                cin >> cnt;
+                tasks.AddNewTasks(name, cnt);
+                cout << tasks.GetPersonTasksInfo(name) << endl;
+            } else if (cmd == "PerformPersonTasks") {
+                int cnt;
+                cin >> cnt;
+                TasksInfo updated_tasks, untouched_tasks;
+                tie(updated_tasks, untouched_tasks) = tasks.PerformPersonTasks(name, cnt);
+                cout << '[' << updated_tasks << ", " << untouched_tasks << ']' << endl;
+            } else if (cmd == "GetPersonTasksInfo") {
+                cout << tasks.GetPersonTasksInfo(name) << endl;
+            }
+        }
+        return 0;
+    }
+
+#endif
     return 0;
 }
